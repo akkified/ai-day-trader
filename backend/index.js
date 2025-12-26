@@ -2,21 +2,19 @@ const cors = require("cors");
 const express = require("express");
 const Broker = require("./broker");
 const scanMarket = require("./scanner");
-const decideTrade = require("./ai");
+// Destructure trainAI from your ai.js module
+const { decideTrade, trainAI } = require("./ai"); 
 const runTradingCycle = require("./trader");
 const startScheduler = require("./scheduler");
 
 const app = express();
-const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+const PORT = process.env.PORT || 10000; // Standard Render port
 
 // Middleware
 app.use(cors());
 app.use(express.json());
 
-// Initialize the global broker (for live/simulated trading)
+// Initialize the global broker
 const broker = new Broker();
 
 /* --- PUBLIC ROUTES --- */
@@ -25,9 +23,22 @@ app.get("/", (req, res) => {
   res.send("AI Quant Backend is Active");
 });
 
-// GET the current account status (Cash, Positions, Trades, Portfolio Value)
 app.get("/status", (req, res) => {
   res.json(broker.getStatus());
+});
+
+/* --- AI & RETRAINING ROUTES --- */
+
+// NEW: This fixes your 404 error
+app.post("/retrain", async (req, res) => {
+  try {
+    console.log("🚀 Manual Retrain Triggered...");
+    await trainAI(); 
+    res.json({ message: "Neural Network successfully retrained on cloud data." });
+  } catch (error) {
+    console.error("Retrain Route Error:", error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 /* --- MANUAL OVERRIDE ROUTES --- */
@@ -46,7 +57,6 @@ app.post("/sell", (req, res) => {
 
 /* --- MARKET DATA & AI ROUTES --- */
 
-// Perform a real-time scan of the watchlist
 app.get("/scan", async (req, res) => {
   try {
     const results = await scanMarket();
@@ -56,7 +66,6 @@ app.get("/scan", async (req, res) => {
   }
 });
 
-// Get AI decisions based on current market data
 app.get("/decide", async (req, res) => {
   try {
     const scanResults = await scanMarket();
@@ -70,7 +79,7 @@ app.get("/decide", async (req, res) => {
   }
 });
 
-/* --- BACKTESTING ENGINE (Phase 3) --- */
+/* --- BACKTESTING ENGINE --- */
 
 app.post("/backtest", async (req, res) => {
   const { historyData } = req.body; 
@@ -78,18 +87,13 @@ app.post("/backtest", async (req, res) => {
     return res.status(400).json({ error: "Invalid history data" });
   }
 
-  // Use a fresh broker instance so we don't affect live cash
   const testBroker = new Broker(); 
   
   historyData.forEach(bar => {
-    // 1. Sync price to the test broker
-    testBroker.updateMarketPrice(bar.symbol, bar.price);
-
-    // 2. Get AI decision based on the historical bar
+    testBroker.updateMarketPrice?.(bar.symbol, bar.price);
     const position = testBroker.positions[bar.symbol];
     const decision = decideTrade(bar, position);
 
-    // 3. Execute logic (using Phase 1 & 2 rules)
     if (decision.action === "BUY" && !position) {
       testBroker.buy(bar.symbol, bar.price);
     } else if (decision.action === "SELL") {
@@ -102,15 +106,15 @@ app.post("/backtest", async (req, res) => {
 
 /* --- AUTOMATION CONTROL --- */
 
-// Manually trigger a trading cycle
 app.post("/run", async (req, res) => {
   await runTradingCycle(broker);
   res.json(broker.getStatus());
 });
 
-// Start the persistent 15-minute scheduler
+// Start the persistent scheduler
 startScheduler(broker);
 
+// REMOVED the first app.listen and kept only this one at the bottom
 app.listen(PORT, () => {
   console.log(`🚀 AI Quant Server running on port ${PORT}`);
 });
