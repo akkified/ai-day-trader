@@ -1,68 +1,59 @@
 const axios = require("axios");
 
 /**
- * Scans a list of stocks plus the SPY index for market sentiment context.
- * Returns an object with individual stock data and the overall market move.
+ * Scans a list of stocks plus the SPY index using Finnhub.
+ * Finnhub is faster and better suited for real-time decision making.
  */
 async function scanMarket() {
-  // We include SPY to gauge the "mood" of the overall market
   const symbols = ["SPY", "NVDA", "AAPL", "TSLA", "AMD", "MSFT"];
   const results = [];
-  const API_KEY = process.env.ALPHA_VANTAGE_KEY;
+  const API_KEY = process.env.FINNHUB_KEY; // Using Finnhub Token
 
   if (!API_KEY) {
-    console.error("❌ ERROR: ALPHA_VANTAGE_KEY is missing.");
+    console.error("❌ ERROR: FINNHUB_KEY is missing.");
     throw new Error("Missing API Key");
   }
 
-  for (const symbol of symbols) {
+  // We use Promise.all to scan all symbols concurrently (faster)
+  const scanPromises = symbols.map(async (symbol) => {
     try {
-      console.log(`🔍 Scanning ${symbol}...`);
+      // console.log(`🔍 Scanning ${symbol}...`);
       
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+      const url = `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${API_KEY}`;
       const response = await axios.get(url);
-      
-      // Handle Rate Limits (Free tier is strict)
-      if (response.data["Note"]) {
-        console.warn(`⏳ Rate limit hit for ${symbol}. Waiting for next cycle.`);
-        continue;
-      }
+      const data = response.data;
 
-      const quote = response.data["Global Quote"];
-      
-      if (quote && quote["05. price"]) {
-        // Clean the percentage string into a raw number for the AI
-        const rawChangePercent = quote["10. change percent"] || "0%";
-        const numericChangePercent = parseFloat(rawChangePercent.replace('%', ''));
-
-        results.push({
+      // Finnhub Response Keys:
+      // c: Current price, d: Change, dp: Percent change
+      if (data.c && data.c !== 0) {
+        return {
           symbol: symbol,
-          price: parseFloat(quote["05. price"]),
-          change: parseFloat(quote["09. change"]),
-          changePercent: numericChangePercent,
-          volume: parseInt(quote["06. volume"]),
+          price: data.c,
+          change: data.d,
+          changePercent: data.dp, // Already a number, no string cleaning needed
           time: new Date()
-        });
-        
-        console.log(`✅ ${symbol}: $${quote["05. price"]} (${numericChangePercent}%)`);
+        };
       }
-
-      // 2-second delay to safely stay under the 5 calls/min limit
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
     } catch (error) {
       console.error(`❌ Scan Failed for ${symbol}:`, error.message);
     }
-  }
+    return null;
+  });
+
+  const rawResults = await Promise.all(scanPromises);
+  const resultsFiltered = rawResults.filter(r => r !== null);
 
   // --- MARKET SENTIMENT LOGIC ---
-  // Find SPY in our results to act as the "Market Sentiment"
-  const spyData = results.find(r => r.symbol === "SPY");
+  const spyData = resultsFiltered.find(r => r.symbol === "SPY");
   const marketSentiment = spyData ? spyData.changePercent : 0;
 
-  // Return the stocks (excluding SPY) and the sentiment baseline
+  // Logging results for transparency
+  resultsFiltered.forEach(r => {
+    console.log(`✅ ${r.symbol}: $${r.price.toFixed(2)} (${r.changePercent.toFixed(2)}%)`);
+  });
+
   return {
-    stocks: results.filter(r => r.symbol !== "SPY"),
+    stocks: resultsFiltered.filter(r => r.symbol !== "SPY"),
     marketSentiment: marketSentiment
   };
 }
