@@ -2,29 +2,20 @@ const mongoose = require('mongoose');
 
 // 1. Define the Schema for AI training lessons
 const TradeSchema = new mongoose.Schema({
-  input: {
-    sentiment: Number, 
-    change: Number     
-  },
-  output: {
-    buy: Number        
-  },
-  details: {
-    symbol: String,
-    price: Number,
-    profit: Number,
-    time: { type: Date, default: Date.now }
-  }
+  input: { sentiment: Number, change: Number },
+  output: { buy: Number },
+  details: { symbol: String, price: Number, profit: Number, time: { type: Date, default: Date.now } }
 });
 
 const TradeHistory = mongoose.models.TradeHistory || mongoose.model('TradeHistory', TradeSchema);
 
 class Broker {
   constructor() {
+    this.initialCash = 10000;
     this.cash = 10000;
     this.positions = {};
     this.trades = []; 
-    this.trailPercent = 0.02; // 2% Trailing Stop Loss
+    this.trailPercent = 0.02; 
     
     if (mongoose.connection.readyState === 0) {
       mongoose.connect(process.env.MONGO_URI)
@@ -34,13 +25,34 @@ class Broker {
   }
 
   /**
-   * Executes a Buy order
-   * UPDATED: Now accepts 'confidence' to pass to the frontend journal
+   * Calculates current total portfolio value (Cash + Market Value of Positions)
    */
+  getTotalValue() {
+    let positionsValue = 0;
+    // Note: In a real app, you'd pass current market prices here. 
+    // Using entryPrice as a fallback for sizing calculations.
+    Object.values(this.positions).forEach(pos => {
+      positionsValue += (pos.amount * pos.entryPrice);
+    });
+    return parseFloat(this.cash) + positionsValue;
+  }
+
   buy(symbol, price, sentiment, change, confidence) {
     if (this.positions[symbol]) return; 
 
-    const amount = Math.floor(this.cash / price);
+    // --- POSITION SIZING LOGIC ---
+    // We want to risk only 20% of our TOTAL EQUITY per trade.
+    const totalEquity = this.getTotalValue();
+    const allocation = totalEquity * 0.20; 
+
+    // Determine how many shares $2,000 (20% of 10k) can buy
+    let amount = Math.floor(allocation / price);
+
+    // Safety: If allocation is more than actual cash on hand, use remaining cash
+    if ((amount * price) > this.cash) {
+      amount = Math.floor(this.cash / price);
+    }
+
     if (amount > 0) {
       this.cash -= (amount * price);
       
@@ -50,10 +62,9 @@ class Broker {
         highPrice: price, 
         entrySentiment: sentiment, 
         entryChange: change,
-        confidence: confidence // Store for sell reference
+        confidence: confidence 
       };
 
-      // UPDATED: Added amount and confidence for the Frontend Journal
       const tradeRecord = { 
         action: "BUY", 
         symbol, 
@@ -64,14 +75,12 @@ class Broker {
       };
       
       this.trades.push(tradeRecord);
-      
-      console.log(`[BROKER] 🛒 BUY ${symbol} @ $${price.toFixed(2)} | Qty: ${amount} | Conf: ${(confidence * 100).toFixed(1)}%`);
+      console.log(`[BROKER] 🛒 BUY ${symbol} | Qty: ${amount} ($${(amount * price).toFixed(2)}) | Remaining Cash: $${this.cash.toFixed(2)}`);
+    } else {
+      console.log(`[BROKER] ⚠️ Insufficient funds to open 20% position in ${symbol}`);
     }
   }
 
-  /**
-   * Executes a Sell order
-   */
   async sell(symbol, price, reason) {
     const pos = this.positions[symbol];
     if (!pos) return;
@@ -90,7 +99,6 @@ class Broker {
 
     this.cash += (pos.amount * price);
     
-    // UPDATED: Added amount and profit for the Frontend Journal
     const tradeRecord = { 
       action: "SELL", 
       symbol, 
@@ -120,14 +128,10 @@ class Broker {
     return dropPercentage >= this.trailPercent;
   }
 
-  /**
-   * UPDATED: Returns detailed position objects so "Open Risk" 
-   * can show share counts and entry prices.
-   */
   getStatus() {
     return {
-      cash: this.cash.toFixed(2),
-      positions: this.positions, // Now returns the full object { NVDA: { amount: 10, ... } }
+      cash: parseFloat(this.cash).toFixed(2),
+      positions: this.positions,
       trades: this.trades 
     };
   }
