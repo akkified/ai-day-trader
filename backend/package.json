@@ -12,7 +12,7 @@
   "type": "commonjs",
   "dependencies": {
     "axios": "^1.13.2",
-    "brain.js": "^2.0.0-beta.24",
+    "brain.js": "^1.2.2",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",
