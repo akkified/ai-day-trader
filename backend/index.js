@@ -79,7 +79,7 @@ app.get("/decide", async (req, res) => {
 
 app.post("/run", async (req, res) => {
   try {
-    // We pass the broker AND the ai functions to avoid circular requires in trader.js
+    // We pass the broker AND the ai function to the cycle
     await runTradingCycle(broker, decideTrade);
     res.json(broker.getStatus());
   } catch (error) {
@@ -87,10 +87,19 @@ app.post("/run", async (req, res) => {
   }
 });
 
-// Initialize Automation
-startScheduler(broker);
+// --- THE FIX ---
+// Initialize Automation and pass decideTrade to the scheduler
+startScheduler(broker, decideTrade);
 
 app.listen(PORT, () => {
   console.log(`🚀 AI Quant Server running on port ${PORT}`);
-  console.log(`AUTH CHECK: ALPHA_VANTAGE_KEY is ${process.env.ALPHA_VANTAGE_KEY ? 'Present' : 'MISSING'}`);
+  
+  // Final diagnostic check
+  const isKeyOk = !!process.env.ALPHA_VANTAGE_KEY;
+  const isAiOk = typeof decideTrade === 'function';
+  
+  console.log(`--- Startup Health Check ---`);
+  console.log(`1. API Key: ${isKeyOk ? '✅ Present' : '❌ MISSING'}`);
+  console.log(`2. AI Logic: ${isAiOk ? '✅ Valid' : '❌ INVALID'}`);
+  console.log(`----------------------------`);
 });
