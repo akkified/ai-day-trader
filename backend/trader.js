@@ -1,50 +1,55 @@
 const scanMarket = require("./scanner");
 
 /**
- * Runs the trading cycle by fetching market data and passing it to the AI.
  * @param {Object} broker - The global broker instance
- * @param {Function} decideTrade - AI logic (expects stock, marketSentiment, and position)
+ * @param {Function} decideTrade - AI logic (expects stock, sentiment, position)
  */
 async function runTradingCycle(broker, decideTrade) {
   try {
-    console.log("🔄 Running context-aware trading cycle...");
+    console.log("🔄 --- Starting Trading Cycle ---");
     
-    // Destructure the new object format from scanner.js
+    // 1. Get Market Data (including SPY sentiment)
     const { stocks, marketSentiment } = await scanMarket();
 
     if (!stocks || stocks.length === 0) {
-      console.log("⚠️ No stock data found in this cycle.");
+      console.log("⚠️ Cycle aborted: No stock data.");
       return;
     }
 
-    console.log(`🌍 Market Sentiment (SPY): ${marketSentiment.toFixed(2)}%`);
+    console.log(`🌍 Global Market Mood (SPY): ${marketSentiment.toFixed(2)}%`);
 
     for (const stock of stocks) {
       const currentPosition = broker.positions[stock.symbol];
       
-      if (typeof decideTrade !== 'function') {
-        throw new Error("decideTrade is not a function. Check index.js imports.");
+      // 2. Safety First: Check Trailing Stop Loss if we already own it
+      if (currentPosition) {
+        const isStopHit = broker.checkTrailingStop(stock.symbol, stock.price);
+        if (isStopHit) {
+          await broker.sell(stock.symbol, stock.price, "Trailing Stop Loss");
+          continue; // Skip AI check for this stock since we already sold
+        }
       }
 
-      // PASS BOTH: The specific stock AND the global market context
+      // 3. Ask AI for opinion
+      // Note: decideTrade now expects (stock, marketSentiment, currentPosition)
       const decision = decideTrade(stock, marketSentiment, currentPosition);
 
+      // 4. Execute Actions based on AI confidence
       if (decision.action === "BUY" && !currentPosition) {
-        console.log(`📈 BUY SIGNAL [${stock.symbol}]: Confidence ${(decision.confidence * 100).toFixed(1)}%`);
-        
-        // Ensure broker records the market context for future AI training
-        broker.buy(stock.symbol, stock.price, 1, {
-          changePercent: stock.changePercent,
-          marketSentiment: marketSentiment
-        }); 
+        // AI sees a breakout opportunity
+        broker.buy(stock.symbol, stock.price, marketSentiment, stock.changePercent);
       } 
       else if (decision.action === "SELL" && currentPosition) {
-        console.log(`📉 SELL SIGNAL [${stock.symbol}]: ${decision.reason}`);
-        broker.sell(stock.symbol, stock.price, decision.reason);
+        // AI predicts a trend reversal
+        await broker.sell(stock.symbol, stock.price, decision.reason || "AI Sell Signal");
       }
     }
+    
+    console.log("✅ --- Cycle Complete ---");
+    console.log("Current Portfolio Status:", broker.getStatus());
+
   } catch (error) {
-    console.error("❌ Cycle Error:", error.message);
+    console.error("❌ Critical Trader Error:", error.message);
   }
 }
 
