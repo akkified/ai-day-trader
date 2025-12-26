@@ -1,14 +1,13 @@
 const mongoose = require('mongoose');
 
 // 1. Define the Schema for AI training lessons
-// This matches the format the AI expects to "learn" from your trades
 const TradeSchema = new mongoose.Schema({
   input: {
-    sentiment: Number, // The SPY % change at time of buy
-    change: Number     // The Stock % change at time of buy
+    sentiment: Number, 
+    change: Number     
   },
   output: {
-    buy: Number        // 1 if profit > 0 (Success), 0 if profit <= 0 (Failure)
+    buy: Number        
   },
   details: {
     symbol: String,
@@ -24,10 +23,9 @@ class Broker {
   constructor() {
     this.cash = 10000;
     this.positions = {};
-    this.trades = []; // Array of trade objects
+    this.trades = []; 
     this.trailPercent = 0.02; // 2% Trailing Stop Loss
     
-    // Connect to MongoDB if not already connected
     if (mongoose.connection.readyState === 0) {
       mongoose.connect(process.env.MONGO_URI)
         .then(() => console.log("📦 Broker: MongoDB Connected"))
@@ -36,33 +34,43 @@ class Broker {
   }
 
   /**
-   * Executes a Buy order and tracks the entry conditions
+   * Executes a Buy order
+   * UPDATED: Now accepts 'confidence' to pass to the frontend journal
    */
-  buy(symbol, price, sentiment, change) {
+  buy(symbol, price, sentiment, change, confidence) {
     if (this.positions[symbol]) return; 
 
     const amount = Math.floor(this.cash / price);
     if (amount > 0) {
       this.cash -= (amount * price);
       
-      // We store highPrice to track the "Peak" for the trailing stop
       this.positions[symbol] = { 
         amount, 
         entryPrice: price, 
-        highPrice: price, // Starts at entry price
+        highPrice: price, 
         entrySentiment: sentiment, 
-        entryChange: change 
+        entryChange: change,
+        confidence: confidence // Store for sell reference
       };
 
-      const tradeRecord = { action: "BUY", symbol, price, time: new Date() };
+      // UPDATED: Added amount and confidence for the Frontend Journal
+      const tradeRecord = { 
+        action: "BUY", 
+        symbol, 
+        price, 
+        amount, 
+        confidence, 
+        time: new Date() 
+      };
+      
       this.trades.push(tradeRecord);
       
-      console.log(`[BROKER] 🛒 BUY ${symbol} @ $${price.toFixed(2)} (Mkt: ${sentiment}%)`);
+      console.log(`[BROKER] 🛒 BUY ${symbol} @ $${price.toFixed(2)} | Qty: ${amount} | Conf: ${(confidence * 100).toFixed(1)}%`);
     }
   }
 
   /**
-   * Executes a Sell order and saves the result as a "Lesson" for the AI
+   * Executes a Sell order
    */
   async sell(symbol, price, reason) {
     const pos = this.positions[symbol];
@@ -70,24 +78,24 @@ class Broker {
 
     const profit = (price - pos.entryPrice) * pos.amount;
     
-    // Save the outcome to MongoDB so the AI can learn from this trade
     try {
       await TradeHistory.create({
         input: { sentiment: pos.entrySentiment, change: pos.entryChange },
         output: { buy: profit > 0 ? 1 : 0 },
         details: { symbol, price, profit }
       });
-      console.log(`[BROKER] 📝 AI Lesson saved for ${symbol}. Profit: $${profit.toFixed(2)}`);
     } catch (err) {
-      console.error("❌ Broker: Failed to save lesson to DB:", err.message);
+      console.error("❌ Broker: Failed to save lesson:", err.message);
     }
 
     this.cash += (pos.amount * price);
     
+    // UPDATED: Added amount and profit for the Frontend Journal
     const tradeRecord = { 
       action: "SELL", 
       symbol, 
       price, 
+      amount: pos.amount,
       profit, 
       reason, 
       time: new Date() 
@@ -96,38 +104,31 @@ class Broker {
     this.trades.push(tradeRecord);
     delete this.positions[symbol];
     
-    console.log(`[BROKER] 💰 SELL ${symbol} @ $${price.toFixed(2)} | Reason: ${reason}`);
+    console.log(`[BROKER] 💰 SELL ${symbol} @ $${price.toFixed(2)} | Profit: $${profit.toFixed(2)}`);
   }
 
-  /**
-   * Updates the highPrice and checks if the current price has dropped 
-   * below the trailing stop threshold.
-   */
   checkTrailingStop(symbol, currentPrice) {
     const pos = this.positions[symbol];
     if (!pos) return false;
 
-    // If stock hits a new high, move the trailing stop up
     if (currentPrice > pos.highPrice) {
       pos.highPrice = currentPrice;
       console.log(`[TRAIL] 🛡️ ${symbol} new peak: $${currentPrice.toFixed(2)}`);
     }
 
     const dropPercentage = (pos.highPrice - currentPrice) / pos.highPrice;
-    
-    // Returns true if the drop is 2% or more from the peak
     return dropPercentage >= this.trailPercent;
   }
 
   /**
-   * Returns the status for the Frontend.
-   * FIX: Returns 'trades' as an array to avoid .slice() errors.
+   * UPDATED: Returns detailed position objects so "Open Risk" 
+   * can show share counts and entry prices.
    */
   getStatus() {
     return {
       cash: this.cash.toFixed(2),
-      positions: Object.keys(this.positions),
-      trades: this.trades // This MUST be the array for the frontend to work
+      positions: this.positions, // Now returns the full object { NVDA: { amount: 10, ... } }
+      trades: this.trades 
     };
   }
 }
