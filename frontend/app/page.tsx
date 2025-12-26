@@ -2,28 +2,32 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-  TrendingUp, 
-  Activity, 
-  RefreshCw, 
-  Telescope, 
-  Wallet,
-  History,
-  BrainCircuit,
-  AlertCircle,
-  ArrowUpRight,
-  ArrowDownRight
+  TrendingUp, Activity, RefreshCw, Telescope, Wallet, History,
+  BrainCircuit, AlertCircle, ArrowUpRight, ArrowDownRight, Monitor
 } from 'lucide-react';
 import { 
-  AreaChart, 
-  Area, 
-  XAxis, 
-  YAxis, 
-  CartesianGrid, 
-  Tooltip, 
-  ResponsiveContainer 
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
 } from 'recharts';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
+const MONITORED_SYMBOLS = ["NVDA", "AAPL", "TSLA", "AMD", "MSFT"];
+
+// --- NEW COMPONENT: TRADINGVIEW CHART ---
+function MiniStockChart({ symbol }: { symbol: string }) {
+  return (
+    <div className="h-[200px] w-full rounded-xl overflow-hidden border border-zinc-800/50 bg-zinc-900/20">
+      <iframe
+        title={`Chart for ${symbol}`}
+        width="100%"
+        height="100%"
+        src={`https://s.tradingview.com/widgetembed/?frameElementId=tradingview_76d4d&symbol=${symbol}&interval=5&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=0a0a0b&studies=%5B%5D&theme=dark&style=1&timezone=Etc%2FUTC&studies_overrides=%7B%7D&overrides=%7B%22paneProperties.background%22%3A%22%230a0a0b%22%2C%22paneProperties.vertGridProperties.color%22%3A%22%23111111%22%2C%22paneProperties.horzGridProperties.color%22%3A%22%23111111%22%7D&enabled_features=%5B%5D&disabled_features=%5B%5D&locale=en`}
+        frameBorder="0"
+        allowTransparency={true}
+        scrolling="no"
+      ></iframe>
+    </div>
+  );
+}
 
 export default function TradingDashboard() {
   const [status, setStatus] = useState<any>(null);
@@ -31,14 +35,10 @@ export default function TradingDashboard() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
 
-  // Mock data for the graph - in a real app, this would come from your trade history
   const [chartData, setChartData] = useState([
     { name: '00:00', value: 10000 },
-    { name: '04:00', value: 10200 },
     { name: '08:00', value: 10150 },
-    { name: '12:00', value: 10400 },
     { name: '16:00', value: 10300 },
-    { name: '20:00', value: 10550 },
   ]);
 
   const fetchStatus = async () => {
@@ -49,9 +49,13 @@ export default function TradingDashboard() {
       const data = await res.json();
       setStatus(data);
       
-      // Update chart with live balance if available
       if (data.cash) {
-        setChartData(prev => [...prev.slice(-5), { name: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), value: data.cash }]);
+        setChartData(prev => {
+          const newPoint = { name: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), value: parseFloat(data.cash) };
+          const lastPoint = prev[prev.length - 1];
+          if (lastPoint && lastPoint.value === newPoint.value) return prev;
+          return [...prev.slice(-12), newPoint];
+        });
       }
     } catch (err) {
       console.error("❌ Connection Error:", err);
@@ -69,7 +73,7 @@ export default function TradingDashboard() {
       alert(`System Update: ${data.message}`);
       await fetchStatus();
     } catch (err) {
-      alert("Retraining failed. Check connection.");
+      alert("Retraining failed.");
     } finally {
       setIsTraining(false);
     }
@@ -85,149 +89,147 @@ export default function TradingDashboard() {
     <div className="min-h-screen bg-[#0a0a0b] text-white flex items-center justify-center">
       <div className="flex flex-col items-center gap-2">
         <Activity className="animate-pulse text-blue-500" size={32} />
-        <p className="text-xs font-medium text-zinc-500 uppercase tracking-widest">Waking up the engine...</p>
+        <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Neural Engine Initializing</p>
       </div>
     </div>
   );
 
   return (
-    <main className="min-h-screen bg-[#0a0a0b] text-zinc-200 p-4 md:p-8 selection:bg-blue-500/30">
-      <div className="max-w-6xl mx-auto space-y-8">
+    <main className="min-h-screen bg-[#0a0a0b] text-zinc-200 p-4 md:p-8">
+      <div className="max-w-7xl mx-auto space-y-8">
         
-        {/* --- MINIMALIST HEADER --- */}
+        {/* --- HEADER --- */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Live Terminal</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Autonomous Terminal v2.0</span>
             </div>
-            <h1 className="text-2xl font-semibold text-white tracking-tight">
-              Quant Trading Dashboard
-            </h1>
+            <h1 className="text-2xl font-semibold text-white tracking-tight">System Overview</h1>
           </div>
           
           <div className="flex gap-3">
-            <button 
-              onClick={handleRetrain}
-              disabled={isTraining}
-              className="flex items-center gap-2 bg-zinc-100 hover:bg-white text-black px-5 py-2 rounded-lg transition-all disabled:opacity-50 font-medium text-sm"
-            >
-              <BrainCircuit size={16} />
-              {isTraining ? "Recalibrating..." : "Retrain Model"}
+            <button onClick={handleRetrain} disabled={isTraining} className="flex items-center gap-2 bg-white hover:bg-zinc-200 text-black px-4 py-2 rounded-lg transition-all disabled:opacity-50 text-xs font-bold uppercase tracking-wider">
+              <BrainCircuit size={14} /> {isTraining ? "Recalibrating..." : "Retrain"}
             </button>
-            <button 
-              onClick={fetchStatus}
-              disabled={isRefreshing}
-              className="flex items-center gap-2 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 px-5 py-2 rounded-lg transition-all"
-            >
-              <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
-              <span className="text-sm font-medium">Sync</span>
+            <button onClick={fetchStatus} disabled={isRefreshing} className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-4 py-2 rounded-lg transition-all text-xs font-bold uppercase tracking-wider">
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} /> Sync
             </button>
           </div>
         </header>
 
-        {/* --- PERFORMANCE GRAPH --- */}
-        <section className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl p-6">
-          <div className="flex items-center justify-between mb-8">
-            <h3 className="text-sm font-semibold text-zinc-400 flex items-center gap-2">
-              <TrendingUp size={18} className="text-blue-500" />
-              Equity Curve (USD)
-            </h3>
-            <span className="text-xs text-zinc-500">Real-time performance tracking</span>
+        {/* --- LIVE WATCHLIST (GRAPHS) --- */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Monitor size={14} className="text-blue-500" />
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Neural Watchlist</h3>
           </div>
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={chartData}>
-                <defs>
-                  <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1f2937" />
-                <XAxis dataKey="name" stroke="#4b5563" fontSize={10} tickLine={false} axisLine={false} />
-                <YAxis hide domain={['dataMin - 100', 'dataMax + 100']} />
-                <Tooltip 
-                  contentStyle={{ backgroundColor: '#18181b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '12px' }}
-                  itemStyle={{ color: '#fff' }}
-                />
-                <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            {MONITORED_SYMBOLS.map((symbol) => (
+              <div key={symbol} className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl p-4 space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-white tracking-tighter">{symbol}</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">5M INTERVAL</span>
+                </div>
+                <MiniStockChart symbol={symbol} />
+              </div>
+            ))}
           </div>
         </section>
 
-        {/* --- CORE METRICS --- */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <StatCard title="Total Liquidity" value={`$${status.cash.toLocaleString()}`} change="+2.4%" trend="up" />
-          <StatCard title="Open Positions" value={Object.keys(status.positions).length} change="No Risk" trend="neutral" />
-          <StatCard title="Total Executions" value={status.trades.length} change="Live" trend="up" />
+        {/* --- EQUITY & METRICS --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <section className="lg:col-span-2 bg-zinc-900/40 border border-zinc-800/50 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-8">
+              <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
+                <TrendingUp size={14} className="text-blue-500" /> Equity Curve
+              </h3>
+            </div>
+            <div className="h-[200px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData}>
+                  <defs>
+                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#18181b" />
+                  <XAxis dataKey="name" stroke="#3f3f46" fontSize={10} tickLine={false} axisLine={false} />
+                  <YAxis hide domain={['dataMin - 50', 'dataMax + 50']} />
+                  <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '10px' }} />
+                  <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </section>
+
+          <div className="flex flex-col gap-4">
+            <StatCard title="Liquidity" value={`$${status.cash}`} trend="up" />
+            <StatCard title="Active Risk" value={Object.keys(status.positions).length} trend="neutral" />
+            <StatCard title="Total Trades" value={status.trades.length} trend="up" />
+          </div>
         </div>
 
-        {/* --- ACTIVE WATCHLIST --- */}
+        {/* --- JOURNAL & EXPOSURE --- */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-4">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">Active Exposure</h3>
+          <div className="space-y-4">
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Open Risk</h3>
             <div className="space-y-3">
               {Object.keys(status.positions).length > 0 ? (
                 Object.keys(status.positions).map((symbol) => (
-                  <div key={symbol} className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl flex justify-between items-center">
+                  <div key={symbol} className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-xl flex justify-between items-center group hover:border-blue-500/50 transition-colors">
                     <div>
                       <p className="font-bold text-white text-lg tracking-tight">{symbol}</p>
-                      <p className="text-[10px] text-zinc-500 uppercase font-medium">Standard Lot</p>
+                      <p className="text-[9px] text-zinc-500 font-bold">SHARES: {status.positions[symbol].amount}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-sm font-mono text-emerald-500">${status.positions[symbol].entryPrice}</p>
-                      <p className="text-[10px] text-zinc-500">Entry Basis</p>
+                      <p className="text-[9px] text-zinc-500 uppercase tracking-tighter font-bold">Entry Price</p>
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="p-8 border border-dashed border-zinc-800 rounded-xl text-center">
-                  <p className="text-xs text-zinc-500">Waiting for market entry signals...</p>
+                <div className="p-12 border border-dashed border-zinc-800 rounded-xl text-center bg-zinc-900/20">
+                  <Telescope className="mx-auto text-zinc-700 mb-2" size={24} />
+                  <p className="text-[10px] font-bold text-zinc-600 uppercase">Scanning for Alpha...</p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* --- ACTIVITY LOG --- */}
           <div className="lg:col-span-2 space-y-4">
-            <h3 className="text-xs font-bold text-zinc-500 uppercase tracking-[0.2em]">Order Journal</h3>
+            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Activity Journal</h3>
             <div className="bg-zinc-900/40 border border-zinc-800 rounded-2xl overflow-hidden">
-              <table className="w-full text-left text-sm border-collapse">
+              <table className="w-full text-left text-xs border-collapse">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-[10px] text-zinc-500 uppercase tracking-widest">
-                    <th className="p-4 font-semibold">Asset</th>
-                    <th className="p-4 font-semibold">Side</th>
-                    <th className="p-4 font-semibold text-center">AI Confidence</th>
-                    <th className="p-4 font-semibold text-right">Result</th>
+                  <tr className="border-b border-zinc-800 text-[9px] text-zinc-500 uppercase tracking-widest bg-zinc-900/50">
+                    <th className="p-4 font-bold">Asset</th>
+                    <th className="p-4 font-bold">Side</th>
+                    <th className="p-4 font-bold">Confidence</th>
+                    <th className="p-4 font-bold text-right">Result</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-800/50">
-                  {status.trades.slice().reverse().map((trade: any, idx: number) => (
-                    <tr key={idx} className="hover:bg-zinc-800/20 transition-colors">
-                      <td className="p-4 font-medium text-white">{trade.symbol}</td>
+                  {status.trades.slice().reverse().slice(0, 8).map((trade: any, idx: number) => (
+                    <tr key={idx} className="hover:bg-blue-500/5 transition-colors">
+                      <td className="p-4 font-bold text-white tracking-tighter">{trade.symbol}</td>
                       <td className="p-4">
-                        <span className={`text-[10px] font-bold px-2 py-1 rounded ${
+                        <span className={`text-[9px] font-bold px-2 py-1 rounded-md ${
                           trade.action === 'BUY' ? 'bg-blue-500/10 text-blue-400' : 'bg-zinc-500/10 text-zinc-400'
                         }`}>
                           {trade.action}
                         </span>
                       </td>
                       <td className="p-4">
-                        <div className="flex items-center justify-center gap-3">
-                          <div className="w-20 h-1 bg-zinc-800 rounded-full">
-                            <div 
-                              className="h-full bg-blue-500 rounded-full" 
-                              style={{ width: `${(trade.confidence || 0.5) * 100}%` }}
-                            />
+                        <div className="flex items-center gap-3">
+                          <div className="w-24 h-1 bg-zinc-800 rounded-full overflow-hidden">
+                            <div className="h-full bg-blue-500 transition-all duration-1000" style={{ width: `${(trade.confidence || 0.5) * 100}%` }} />
                           </div>
                           <span className="text-[10px] font-mono text-zinc-500">{(trade.confidence * 100).toFixed(0)}%</span>
                         </div>
                       </td>
-                      <td className={`p-4 text-right font-mono font-medium ${
-                        trade.profit >= 0 ? 'text-emerald-500' : 'text-zinc-500'
-                      }`}>
+                      <td className={`p-4 text-right font-mono font-bold ${trade.profit >= 0 ? 'text-emerald-500' : 'text-zinc-600'}`}>
                         {trade.profit !== undefined ? `${trade.profit >= 0 ? '+' : ''}${trade.profit.toFixed(2)}` : '--'}
                       </td>
                     </tr>
@@ -242,21 +244,13 @@ export default function TradingDashboard() {
   );
 }
 
-function StatCard({ title, value, change, trend }: { title: string, value: string | number, change: string, trend: 'up' | 'down' | 'neutral' }) {
+function StatCard({ title, value, trend }: { title: string, value: string | number, trend: 'up' | 'down' | 'neutral' }) {
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 p-6 rounded-2xl">
-      <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest mb-2">{title}</p>
-      <div className="flex items-end justify-between">
-        <h4 className="text-3xl font-semibold text-white tracking-tight">{value}</h4>
-        <div className={`flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md ${
-          trend === 'up' ? 'text-emerald-500 bg-emerald-500/5' : 
-          trend === 'down' ? 'text-rose-500 bg-rose-500/5' : 
-          'text-zinc-500 bg-zinc-500/5'
-        }`}>
-          {trend === 'up' && <ArrowUpRight size={12} />}
-          {trend === 'down' && <ArrowDownRight size={12} />}
-          {change}
-        </div>
+    <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl hover:border-zinc-700 transition-colors">
+      <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{title}</p>
+      <div className="flex items-center justify-between">
+        <h4 className="text-2xl font-semibold text-white tracking-tight">{value}</h4>
+        {trend === 'up' ? <ArrowUpRight size={16} className="text-emerald-500" /> : <Activity size={16} className="text-zinc-700" />}
       </div>
     </div>
   );
