@@ -1,90 +1,41 @@
-// broker.js
+const mongoose = require('mongoose');
 
 class Broker {
   constructor() {
-    this.cash = 1000;
+    this.cash = 10000;
     this.positions = {};
-    this.tradeHistory = [];
-    this.maxRiskPerTrade = 0.20; // Max 20% of total cash per stock
+    this.trades = [];
+    mongoose.connect(process.env.MONGO_URI).catch(err => console.error("DB Error:", err));
   }
 
-  updateMarketPrice(symbol, currentPrice) {
-    if (this.positions[symbol]) {
-      const pos = this.positions[symbol];
-      pos.currentPrice = currentPrice;
-      pos.unrealizedPl = (currentPrice - pos.entryPrice) * pos.amount;
-      pos.plPercent = ((currentPrice - pos.entryPrice) / pos.entryPrice) * 100;
+  buy(symbol, price, sentiment, change) {
+    const amount = Math.floor(this.cash / price);
+    if (amount > 0) {
+      this.cash -= (amount * price);
+      this.positions[symbol] = { amount, entryPrice: price, entrySentiment: sentiment, entryChange: change };
+      this.trades.push({ action: "BUY", symbol, price, time: new Date() });
     }
   }
 
-  getStatus() {
-    const totalStockValue = Object.values(this.positions).reduce((sum, pos) => {
-      return sum + ((pos.currentPrice || pos.entryPrice) * pos.amount);
-    }, 0);
+  async sell(symbol, price, reason) {
+    const pos = this.positions[symbol];
+    if (!pos) return;
 
-    return {
-      cash: this.cash,
-      portfolioValue: this.cash + totalStockValue,
-      positions: this.positions,
-      trades: this.tradeHistory
-    };
-  }
+    const profit = (price - pos.entryPrice) * pos.amount;
+    const TradeHistory = mongoose.model('TradeHistory');
 
-  buy(symbol, price) {
-    // RISK MANAGEMENT: Calculate "Portion" size
-    // We don't want to buy just 1 share; we want to buy "X dollars worth"
-    const targetInvestment = this.cash * this.maxRiskPerTrade;
-    const amountToBuy = Math.floor(targetInvestment / price);
-
-    if (amountToBuy < 1) {
-      console.log(`⚠️ Skip ${symbol}: Not enough cash for a meaningful position.`);
-      return;
-    }
-
-    const cost = price * amountToBuy;
-    this.cash -= cost;
-    
-    this.positions[symbol] = {
-      amount: amountToBuy,
-      entryPrice: price,
-      currentPrice: price,
-      unrealizedPl: 0,
-      plPercent: 0
-    };
-
-    this.tradeHistory.push({
-      symbol,
-      action: "BUY",
-      price,
-      amount: amountToBuy,
-      time: new Date()
+    await TradeHistory.create({
+      input: { sentiment: (pos.entrySentiment + 1) / 2, change: Math.min(pos.entryChange / 10, 1) },
+      output: { buy: profit > 0 ? 1 : 0 },
+      details: { symbol, profit }
     });
 
-    console.log(`🚀 RISK EXECUTION: Bought ${amountToBuy} ${symbol} at $${price}`);
-  }
-
-  sell(symbol, price, reason = "EXIT") {
-    const position = this.positions[symbol];
-    if (!position) return;
-
-    const proceeds = price * position.amount;
-    const profit = (price - position.entryPrice) * position.amount;
-
-    this.cash += proceeds;
+    this.cash += (pos.amount * price);
     delete this.positions[symbol];
-
-    this.tradeHistory.push({
-      symbol,
-      action: "SELL",
-      price,
-      amount: position.amount,
-      profit,
-      reason, // Logging why we exited (Stop Loss vs Take Profit)
-      time: new Date()
-    });
-
-    console.log(`💰 ${reason}: Sold ${symbol} at $${price} | Net: $${profit.toFixed(2)}`);
+    this.trades.push({ action: "SELL", symbol, price, profit, reason, time: new Date() });
   }
+
+  getStatus() { return { cash: this.cash, positions: this.positions, trades: this.trades }; }
 }
 
 module.exports = Broker;

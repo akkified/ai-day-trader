@@ -8,43 +8,63 @@ import {
   RefreshCw, 
   Telescope, 
   Wallet,
-  ArrowUpRight,
-  History
+  History,
+  BrainCircuit,
+  AlertCircle
 } from 'lucide-react';
 
-// Use the Render URL from Vercel environment variables, fallback to local for dev
+// Use Render URL from Vercel env, fallback to localhost
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 
 export default function TradingDashboard() {
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTraining, setIsTraining] = useState(false);
 
   const fetchStatus = async () => {
     setIsRefreshing(true);
     try {
       const res = await fetch(`${API_BASE_URL}/status`);
+      if (!res.ok) throw new Error("Backend unreachable");
       const data = await res.json();
       setStatus(data);
     } catch (err) {
-      console.error("❌ Failed to fetch from:", API_BASE_URL);
+      console.error("❌ Connection Error:", err);
     } finally {
       setLoading(false);
       setIsRefreshing(false);
     }
   };
 
+  const handleRetrain = async () => {
+    setIsTraining(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/retrain`, { method: 'POST' });
+      const data = await res.json();
+      alert(`🧠 AI Update: ${data.message}`);
+      await fetchStatus();
+    } catch (err) {
+      alert("Failed to trigger retraining. Check Render logs.");
+    } finally {
+      setIsTraining(false);
+    }
+  };
+
   useEffect(() => {
     fetchStatus();
-    const interval = setInterval(fetchStatus, 30000); // Auto-refresh every 30s
+    const interval = setInterval(fetchStatus, 20000); // Sync every 20s
     return () => clearInterval(interval);
   }, []);
 
   if (loading) return (
     <div className="min-h-screen bg-slate-950 text-white flex items-center justify-center font-mono">
       <div className="flex flex-col items-center gap-4">
-        <RefreshCw className="animate-spin text-blue-500" size={48} />
-        <p className="animate-pulse">WAKING UP NEURAL ENGINE...</p>
+        <div className="relative">
+           <RefreshCw className="animate-spin text-blue-500" size={48} />
+           <BrainCircuit className="absolute inset-0 m-auto text-indigo-400" size={20} />
+        </div>
+        <p className="animate-pulse tracking-widest text-xs">INITIALIZING NEURAL NETWORKS...</p>
       </div>
     </div>
   );
@@ -56,21 +76,35 @@ export default function TradingDashboard() {
         {/* --- HEADER --- */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div>
-            <h1 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-400">
-              FishyStock AI
+            <h1 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-indigo-400 to-emerald-400">
+              GEMINI QUANT v1.2
             </h1>
-            <p className="text-xs text-slate-500 font-mono mt-1">
-              STATUS: <span className="text-emerald-500">AUTONOMOUS_TRADING_ACTIVE</span>
+            <p className="text-[10px] text-slate-500 font-mono mt-1">
+              NODE_ENV: <span className="text-emerald-500 uppercase">production_stable</span> | 
+              DATABASE: <span className="text-indigo-400 uppercase ml-1 text-[9px]">MongoDB_Atlas</span>
             </p>
           </div>
-          <button 
-            onClick={fetchStatus}
-            disabled={isRefreshing}
-            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl transition-all active:scale-95"
-          >
-            <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
-            <span className="text-sm font-bold">FORCE SYNC</span>
-          </button>
+          
+          <div className="flex gap-2">
+            <button 
+              onClick={handleRetrain}
+              disabled={isTraining}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 border border-indigo-400/50 px-4 py-2 rounded-xl transition-all active:scale-95 disabled:opacity-50"
+            >
+              <BrainCircuit size={16} className={isTraining ? "animate-bounce" : ""} />
+              <span className="text-xs font-bold uppercase tracking-wider">
+                {isTraining ? "Learning..." : "Retrain AI"}
+              </span>
+            </button>
+            <button 
+              onClick={fetchStatus}
+              disabled={isRefreshing}
+              className="flex items-center gap-2 bg-slate-900 hover:bg-slate-800 border border-slate-700 px-4 py-2 rounded-xl transition-all active:scale-95"
+            >
+              <RefreshCw size={16} className={isRefreshing ? "animate-spin" : ""} />
+              <span className="text-xs font-bold uppercase tracking-wider">Sync</span>
+            </button>
+          </div>
         </header>
 
         {/* --- KEY STATS --- */}
@@ -81,78 +115,94 @@ export default function TradingDashboard() {
             icon={<Wallet className="text-blue-400" />} 
           />
           <StatCard 
-            title="Open Positions" 
+            title="Active Positions" 
             value={Object.keys(status.positions).length} 
             icon={<Activity className="text-emerald-400" />} 
           />
           <StatCard 
-            title="Total Trades" 
+            title="Training Lessons" 
             value={status.trades.length} 
             icon={<History className="text-purple-400" />} 
           />
         </div>
 
-        {/* --- DEEP SCAN DISCOVERY --- */}
-        <section className="bg-indigo-600/5 border border-indigo-500/20 rounded-2xl p-5 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <Telescope size={28} className="text-indigo-400" />
-              <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-indigo-500"></span>
-              </span>
-            </div>
-            <div>
-              <h3 className="text-sm font-black tracking-widest uppercase">Autonomous Hunter Active</h3>
-              <p className="text-[10px] text-slate-500 font-mono">Live Gainers from Render Backend</p>
-            </div>
+        {/* --- AI SCANNER BOX --- */}
+        <section className="bg-indigo-600/5 border border-indigo-500/20 rounded-2xl p-5">
+          <div className="flex items-center gap-4 mb-4">
+            <Telescope size={24} className="text-indigo-400" />
+            <h3 className="text-xs font-black tracking-widest uppercase">Deep Scan Results</h3>
           </div>
           <div className="flex flex-wrap gap-3">
-            {status.trades.length > 0 ? (
-              // Displaying the last 4 symbols the bot interacted with
-              [...new Set(status.trades.map((t: any) => t.symbol))].slice(-4).map((symbol: any, i) => (
-                <div key={i} className="flex items-center gap-2 bg-slate-900 px-3 py-2 rounded-lg border border-slate-800">
-                  <span className="text-xs font-bold text-white uppercase">{symbol}</span>
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            {Object.keys(status.positions).length > 0 ? (
+              Object.keys(status.positions).map((symbol) => (
+                <div key={symbol} className="flex items-center gap-3 bg-slate-900 px-4 py-2 rounded-xl border border-slate-800">
+                  <span className="text-sm font-bold">{symbol}</span>
+                  <div className="h-4 w-[1px] bg-slate-700"></div>
+                  <div className="flex flex-col">
+                    <span className="text-[8px] text-slate-500 uppercase">Entry</span>
+                    <span className="text-xs font-mono text-emerald-400">${status.positions[symbol].entryPrice}</span>
+                  </div>
                 </div>
               ))
             ) : (
-              <span className="text-xs text-slate-600 italic">Scanning Market...</span>
+              <div className="flex items-center gap-2 text-slate-600 text-xs italic">
+                <AlertCircle size={14} />
+                Neural Engine standing by for market volatility...
+              </div>
             )}
           </div>
         </section>
 
-        {/* --- ACTIVE TRADES TABLE --- */}
+        {/* --- TRADE LOG --- */}
         <section className="bg-slate-900/50 border border-slate-800 rounded-2xl overflow-hidden">
-          <div className="p-4 border-b border-slate-800 bg-slate-900/80">
-            <h2 className="text-sm font-bold flex items-center gap-2">
+          <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+            <h2 className="text-xs font-bold flex items-center gap-2 tracking-widest uppercase">
               <TrendingUp size={16} className="text-emerald-400" /> 
-              TRADE LOG (REAL-TIME)
+              Execution History
             </h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead>
+              <thead className="bg-slate-900/80">
                 <tr className="text-slate-500 border-b border-slate-800">
-                  <th className="p-4 font-medium uppercase tracking-wider text-[10px]">Symbol</th>
-                  <th className="p-4 font-medium uppercase tracking-wider text-[10px]">Action</th>
-                  <th className="p-4 font-medium uppercase tracking-wider text-[10px]">Price</th>
-                  <th className="p-4 font-medium uppercase tracking-wider text-[10px]">Reason</th>
+                  <th className="p-4 font-bold text-[10px] uppercase tracking-wider">Asset</th>
+                  <th className="p-4 font-bold text-[10px] uppercase tracking-wider">Type</th>
+                  <th className="p-4 font-bold text-[10px] uppercase tracking-wider">Price</th>
+                  <th className="p-4 font-bold text-[10px] uppercase tracking-wider">AI Confidence</th>
+                  <th className="p-4 font-bold text-[10px] uppercase tracking-wider text-right">Profit/Loss</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/50">
                 {status.trades.slice().reverse().map((trade: any, idx: number) => (
                   <tr key={idx} className="hover:bg-slate-800/30 transition-colors">
-                    <td className="p-4 font-bold">{trade.symbol}</td>
+                    <td className="p-4 font-bold text-white">{trade.symbol}</td>
                     <td className="p-4">
-                      <span className={`px-2 py-1 rounded text-[10px] font-black ${
-                        trade.type === 'BUY' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
+                      <span className={`px-2 py-0.5 rounded-md text-[9px] font-black tracking-tighter ${
+                        trade.action === 'BUY' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'
                       }`}>
-                        {trade.type}
+                        {trade.action}
                       </span>
                     </td>
-                    <td className="p-4 font-mono text-slate-300">${trade.price}</td>
-                    <td className="p-4 text-xs text-slate-500">{trade.reason || 'Technical Entry'}</td>
+                    <td className="p-4 font-mono text-slate-400">${trade.price}</td>
+                    <td className="p-4">
+                        {/* Confidence Meter */}
+                        <div className="flex items-center gap-2">
+                            <div className="w-16 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                <div 
+                                    className="h-full bg-indigo-500" 
+                                    style={{ width: `${(trade.confidence || 0.5) * 100}%` }}
+                                ></div>
+                            </div>
+                            <span className="text-[10px] font-mono text-indigo-300">
+                                {trade.confidence ? (trade.confidence * 100).toFixed(0) : "50"}%
+                            </span>
+                        </div>
+                    </td>
+                    <td className={`p-4 text-right font-mono font-bold ${
+                      trade.profit >= 0 ? 'text-emerald-400' : 'text-red-400'
+                    }`}>
+                      {trade.profit !== undefined ? `${trade.profit >= 0 ? '+' : ''}${trade.profit.toFixed(2)}` : '--'}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -166,13 +216,13 @@ export default function TradingDashboard() {
 
 function StatCard({ title, value, icon }: { title: string, value: string | number, icon: React.ReactNode }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl group hover:border-slate-700 transition-all">
+    <div className="bg-slate-900 border border-slate-800 p-5 rounded-2xl group hover:border-slate-700 transition-all shadow-xl">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{title}</p>
-          <p className="text-2xl font-bold mt-1 text-white">{value}</p>
+          <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">{title}</p>
+          <p className="text-2xl font-bold mt-1 text-white tracking-tight">{value}</p>
         </div>
-        <div className="p-2 bg-slate-800 rounded-lg group-hover:scale-110 transition-transform">
+        <div className="p-3 bg-slate-950 rounded-xl group-hover:scale-110 transition-transform border border-slate-800">
           {icon}
         </div>
       </div>
