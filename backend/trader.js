@@ -1,5 +1,5 @@
 // trader.js
-const scanMarket = require("./scanner");
+const { scanMarket } = require("./scanner");
 const decideTrade = require("./ai");
 
 async function runTradingCycle(broker) {
