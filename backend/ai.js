@@ -104,7 +104,7 @@ function decideTrade(stock, marketSentiment = 0, position) {
   // --- Trading Logic ---
   
   // 1. BUY Condition
-  if (confidence > 0.65 && marketSentiment > -1.5 && !position) {
+  if (confidence > 0.25 && marketSentiment > -1.5 && !position) {
     return { action: "BUY", confidence, reason: "Relative Strength" };
   } 
   
