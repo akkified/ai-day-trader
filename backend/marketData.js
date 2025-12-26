@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const API_KEY = "d4gisehr01qm5b35qpq0d4gisehr01qm5b35qpqg";
+const API_KEY = process.env.FINNHUB_API_KEY;
 const BASE_URL = "https://finnhub.io/api/v1";
 
 async function getStockData(symbol) {
