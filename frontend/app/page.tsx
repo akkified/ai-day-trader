@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { 
   TrendingUp, Activity, RefreshCw, Telescope, Wallet, History,
-  BrainCircuit, AlertCircle, ArrowUpRight, ArrowDownRight, Monitor
+  BrainCircuit, AlertCircle, ArrowUpRight, ArrowDownRight, Monitor, ChevronDown
 } from 'lucide-react';
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -12,10 +12,10 @@ import {
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:4000";
 const MONITORED_SYMBOLS = ["NVDA", "AAPL", "TSLA", "AMD", "MSFT"];
 
-// --- NEW COMPONENT: TRADINGVIEW CHART ---
-function MiniStockChart({ symbol }: { symbol: string }) {
+// --- REFINED COMPONENT: TRADINGVIEW CHART ---
+function StockChartPane({ symbol }: { symbol: string }) {
   return (
-    <div className="h-[200px] w-full rounded-xl overflow-hidden border border-zinc-800/50 bg-zinc-900/20">
+    <div className="h-[400px] w-full rounded-2xl overflow-hidden border border-zinc-800/50 bg-black">
       <iframe
         title={`Chart for ${symbol}`}
         width="100%"
@@ -34,6 +34,7 @@ export default function TradingDashboard() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isTraining, setIsTraining] = useState(false);
+  const [selectedSymbol, setSelectedSymbol] = useState(MONITORED_SYMBOLS[0]);
 
   const [chartData, setChartData] = useState([
     { name: '00:00', value: 10000 },
@@ -99,11 +100,11 @@ export default function TradingDashboard() {
       <div className="max-w-7xl mx-auto space-y-8">
         
         {/* --- HEADER --- */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-zinc-900 pb-8">
           <div>
             <div className="flex items-center gap-2 mb-1">
               <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Autonomous Terminal v2.0</span>
+              <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">Autonomous Terminal v2.1</span>
             </div>
             <h1 className="text-2xl font-semibold text-white tracking-tight">System Overview</h1>
           </div>
@@ -118,61 +119,73 @@ export default function TradingDashboard() {
           </div>
         </header>
 
-        {/* --- LIVE WATCHLIST (GRAPHS) --- */}
-        <section className="space-y-4">
-          <div className="flex items-center gap-2">
-            <Monitor size={14} className="text-blue-500" />
-            <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Neural Watchlist</h3>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4">
-            {MONITORED_SYMBOLS.map((symbol) => (
-              <div key={symbol} className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl p-4 space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-white tracking-tighter">{symbol}</span>
-                  <span className="text-[10px] text-zinc-500 font-mono">5M INTERVAL</span>
-                </div>
-                <MiniStockChart symbol={symbol} />
+        {/* --- DUAL PANE: CHART SELECTOR & EQUITY --- */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* LEFT PANE: ENHANCED CHART VIEW */}
+          <section className="lg:col-span-2 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Monitor size={14} className="text-blue-500" />
+                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Neural Watchlist</h3>
               </div>
-            ))}
-          </div>
-        </section>
-
-        {/* --- EQUITY & METRICS --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="lg:col-span-2 bg-zinc-900/40 border border-zinc-800/50 rounded-2xl p-6">
-            <div className="flex items-center justify-between mb-8">
-              <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2">
-                <TrendingUp size={14} className="text-blue-500" /> Equity Curve
-              </h3>
+              {/* SELECTOR PILLS */}
+              <div className="flex gap-1 bg-zinc-900/50 p-1 rounded-lg border border-zinc-800">
+                {MONITORED_SYMBOLS.map((symbol) => (
+                  <button
+                    key={symbol}
+                    onClick={() => setSelectedSymbol(symbol)}
+                    className={`px-3 py-1 rounded-md text-[10px] font-bold transition-all ${
+                      selectedSymbol === symbol 
+                      ? 'bg-zinc-800 text-white' 
+                      : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    {symbol}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="h-[200px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={chartData}>
-                  <defs>
-                    <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#18181b" />
-                  <XAxis dataKey="name" stroke="#3f3f46" fontSize={10} tickLine={false} axisLine={false} />
-                  <YAxis hide domain={['dataMin - 50', 'dataMax + 50']} />
-                  <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '10px' }} />
-                  <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+            <StockChartPane symbol={selectedSymbol} />
           </section>
 
-          <div className="flex flex-col gap-4">
-            <StatCard title="Liquidity" value={`$${status.cash}`} trend="up" />
-            <StatCard title="Active Risk" value={Object.keys(status.positions).length} trend="neutral" />
-            <StatCard title="Total Trades" value={status.trades.length} trend="up" />
+          {/* RIGHT PANE: EQUITY & STATS */}
+          <div className="space-y-6">
+            <div className="bg-zinc-900/40 border border-zinc-800/50 rounded-2xl p-6 h-full flex flex-col justify-between">
+              <div>
+                <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest flex items-center gap-2 mb-6">
+                  <TrendingUp size={14} className="text-blue-500" /> Performance
+                </h3>
+                <div className="h-[200px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={chartData}>
+                      <defs>
+                        <linearGradient id="colorValue" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.2}/>
+                          <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#18181b" />
+                      <XAxis dataKey="name" stroke="#3f3f46" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis hide domain={['dataMin - 50', 'dataMax + 50']} />
+                      <Tooltip contentStyle={{ backgroundColor: '#09090b', border: '1px solid #27272a', borderRadius: '8px', fontSize: '10px' }} />
+                      <Area type="monotone" dataKey="value" stroke="#3b82f6" fillOpacity={1} fill="url(#colorValue)" strokeWidth={2} />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              <div className="grid gap-4 mt-6">
+                <StatCard title="Liquidity" value={`$${status.cash}`} trend="up" />
+                <StatCard title="Active Risk" value={Object.keys(status.positions).length} trend="neutral" />
+                <StatCard title="Total Trades" value={status.trades.length} trend="up" />
+              </div>
+            </div>
           </div>
         </div>
 
         {/* --- JOURNAL & EXPOSURE --- */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 pt-4">
           <div className="space-y-4">
             <h3 className="text-[10px] font-bold text-zinc-500 uppercase tracking-[0.2em]">Open Risk</h3>
             <div className="space-y-3">
@@ -192,7 +205,7 @@ export default function TradingDashboard() {
               ) : (
                 <div className="p-12 border border-dashed border-zinc-800 rounded-xl text-center bg-zinc-900/20">
                   <Telescope className="mx-auto text-zinc-700 mb-2" size={24} />
-                  <p className="text-[10px] font-bold text-zinc-600 uppercase">Scanning for Alpha...</p>
+                  <p className="text-[10px] font-bold text-zinc-600 uppercase">Scanning Alpha...</p>
                 </div>
               )}
             </div>
@@ -246,11 +259,11 @@ export default function TradingDashboard() {
 
 function StatCard({ title, value, trend }: { title: string, value: string | number, trend: 'up' | 'down' | 'neutral' }) {
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800 p-5 rounded-2xl hover:border-zinc-700 transition-colors">
+    <div className="bg-zinc-900/30 border border-zinc-800 p-4 rounded-xl hover:border-zinc-700 transition-colors">
       <p className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest mb-1">{title}</p>
       <div className="flex items-center justify-between">
-        <h4 className="text-2xl font-semibold text-white tracking-tight">{value}</h4>
-        {trend === 'up' ? <ArrowUpRight size={16} className="text-emerald-500" /> : <Activity size={16} className="text-zinc-700" />}
+        <h4 className="text-xl font-semibold text-white tracking-tight">{value}</h4>
+        {trend === 'up' ? <ArrowUpRight size={14} className="text-emerald-500" /> : <Activity size={14} className="text-zinc-700" />}
       </div>
     </div>
   );
