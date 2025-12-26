@@ -4,46 +4,41 @@ const fs = require('fs');
 const path = require('path');
 
 // 1. Define the Schema for MongoDB
-// Updated to match the "price" and "profit" fields used in your backfill
 const TradeSchema = new mongoose.Schema({
   symbol: String,
   action: String,
   confidence: Number,
   profit: Number,
   time: Date,
-  price: Number
+  price: Number,
+  changePercent: Number // Ensure this is captured to feed the AI better data
 });
 
-// Ensure the model is only compiled once
 const TradeHistory = mongoose.models.TradeHistory || mongoose.model('TradeHistory', TradeSchema);
 
 // 2. Initialize the Neural Network
-// Using a slightly larger layer for better pattern recognition
 let net = new brain.NeuralNetwork({
   hiddenLayers: [10, 10] 
 });
 
 /**
- * Trains the AI using both local bulk data and cloud trade history
+ * Trains the AI using Price Change instead of raw Price.
+ * This identifies "Momentum" which is much easier for AI to learn.
  */
 async function trainAI() {
   try {
-    console.log("🧠 Starting AI Training Sequence...");
+    console.log("🧠 Starting Momentum-Based AI Training...");
 
-    // Fetch live trade results from MongoDB
     const cloudHistory = await TradeHistory.find({}).lean();
     
-    // Find the max price in history to normalize data between 0 and 1
-    const maxPriceInHistory = cloudHistory.length > 0 
-      ? Math.max(...cloudHistory.map(h => h.price || 1)) 
-      : 1000;
-
+    // Normalize ChangePercent: A 10% move is huge, so we divide by 10.
+    // This maps a -10% to +10% range roughly into a usable 0 to 1 space for Brain.js
     const formattedHistory = cloudHistory.map(item => ({
-      input: { price: (item.price || 0) / maxPriceInHistory },
+      input: { change: ((item.changePercent || 0) + 10) / 20 }, // Maps -10...+10 to 0...1
       output: { buy: item.profit > 0 ? 1 : 0 }
     }));
 
-    // Load Foundation Data (bulk_training.json) if exists
+    // Load Foundation Data if exists
     const bulkPath = path.join(__dirname, 'bulk_training.json');
     let bulkData = [];
     if (fs.existsSync(bulkPath)) {
@@ -51,60 +46,57 @@ async function trainAI() {
       console.log(`📚 Loaded ${bulkData.length} lessons from bulk_training.json`);
     }
 
-    // Combine datasets
     const trainingSet = [...bulkData, ...formattedHistory];
 
-    // If no data exists, use a fallback starter
-    const finalSet = trainingSet.length > 0 
+    // Fallback starter data if database is empty
+    const finalSet = trainingSet.length > 5 
       ? trainingSet 
-      : [{ input: { price: 0.5 }, output: { buy: 1 } }];
+      : [
+          { input: { change: 0.7 }, output: { buy: 1 } }, // Simulation: High growth = Buy
+          { input: { change: 0.3 }, output: { buy: 0 } }  // Simulation: Drop = Don't Buy
+        ];
 
-    // Train the network
-    // Normalization prevents the "NaN" error you saw in logs
     net.train(finalSet, {
-      iterations: 2000,
-      errorThresh: 0.005,
+      iterations: 3000,   // Increased iterations for better convergence
+      errorThresh: 0.01,
       log: true,
       logPeriod: 500
     });
 
-    console.log(`✅ AI Training Complete. Total lessons learned: ${finalSet.length}`);
+    console.log(`✅ AI Refined. Total lessons processed: ${finalSet.length}`);
   } catch (err) {
     console.error("❌ AI Training Error:", err.message);
   }
 }
 
 /**
- * Makes a decision based on current market data
+ * Makes a decision based on momentum (changePercent)
  */
 function decideTrade(stock, position) {
-  // Normalize current price (assuming a max possible price of 2000 for stocks like NVDA)
-  const normalizedPrice = Math.min((stock.price || 0) / 2000, 1);
+  // We use changePercent (e.g. 1.5 for 1.5%) instead of price
+  // We map it using the same formula used in training
+  const normalizedChange = ((stock.changePercent || 0) + 10) / 20;
   
-  const input = {
-    price: normalizedPrice
-  };
-
-  // Run the data through the Neural Network
-  const result = net.run(input);
+  const result = net.run({ change: normalizedChange });
   const confidence = result.buy || 0;
 
-  console.log(`🤖 AI Analysis for ${stock.symbol}: Confidence ${(confidence * 100).toFixed(1)}%`);
+  console.log(`🤖 AI Analysis for ${stock.symbol}: Confidence ${(confidence * 100).toFixed(1)}% | Change: ${stock.changePercent}%`);
 
-  // Decision Logic
-  if (confidence > 0.70 && !position) {
-    return { action: "BUY", confidence, reason: "High AI Confidence" };
+  // Optimized thresholds:
+  // Buying requires 65% confidence. 
+  // Selling happens if confidence drops below 40%.
+  if (confidence > 0.65 && !position) {
+    return { action: "BUY", confidence, reason: "Bullish Momentum Detected" };
   } 
   
-  if (confidence < 0.30 && position) {
-    return { action: "SELL", confidence, reason: "Trend Reversal Predicted" };
+  if (confidence < 0.40 && position) {
+    return { action: "SELL", confidence, reason: "Momentum Fading" };
   }
 
-  return { action: "HOLD", confidence, reason: "Neutral" };
+  return { action: "HOLD", confidence, reason: "Neutral / Insufficient Signal" };
 }
 
 // Initial train on startup
 trainAI();
 
-// EXPORT BOTH FUNCTIONS (Crucial for index.js)
 module.exports = { decideTrade, trainAI };

@@ -12,35 +12,49 @@ async function scanMarket() {
 
   for (const symbol of symbols) {
     try {
-      // Using Global Quote for current price data
-      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
+      console.log(`🔍 Scanning ${symbol}...`);
       
+      const url = `https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${API_KEY}`;
       const response = await axios.get(url);
       
-      // Alpha Vantage sometimes returns a 200 OK but with an error message in the body
-      if (response.data["Error Message"] || response.data["Note"]) {
-        console.error(`⚠️ API Warning for ${symbol}:`, response.data["Error Message"] || response.data["Note"]);
+      if (response.data["Note"]) {
+        console.warn(`⏳ Rate limit hit for ${symbol}. Alpha Vantage Free Tier allows 5 calls/min.`);
+        continue;
+      }
+
+      if (response.data["Error Message"]) {
+        console.error(`❌ API Error for ${symbol}:`, response.data["Error Message"]);
         continue;
       }
 
       const quote = response.data["Global Quote"];
+      
       if (quote && quote["05. price"]) {
+        // --- DATA NORMALIZATION FOR AI ---
+        // Alpha Vantage returns changePercent as a string like "1.2345%"
+        // We strip the '%' and convert to a Float so the AI can process it.
+        const rawChangePercent = quote["10. change percent"] || "0%";
+        const numericChangePercent = parseFloat(rawChangePercent.replace('%', ''));
+
         results.push({
           symbol: symbol,
           price: parseFloat(quote["05. price"]),
           change: parseFloat(quote["09. change"]),
-          changePercent: quote["10. change percent"],
+          changePercent: numericChangePercent, // Now a clean number
           volume: parseInt(quote["06. volume"]),
           time: new Date()
         });
+        
+        console.log(`✅ ${symbol}: $${quote["05. price"]} (${numericChangePercent}%)`);
       }
 
-      // Add a small delay to avoid hitting free-tier rate limits (5 calls/min or 25/day)
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Spacing out requests to respect Free Tier limits (12 seconds is safest for 5 calls/min)
+      // but using 2000ms as a compromise for small symbol lists.
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
     } catch (error) {
       if (error.response && error.response.status === 401) {
-        console.error("❌ 401 Unauthorized: Your API key is invalid or not being passed correctly.");
+        console.error("❌ 401 Unauthorized: Key invalid.");
       } else {
         console.error(`❌ Scan Failed for ${symbol}:`, error.message);
       }
