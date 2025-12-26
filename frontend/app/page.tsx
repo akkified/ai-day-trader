@@ -56,8 +56,8 @@ export default function TradingDashboard() {
         {/* --- HEADER --- */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800 pb-6">
           <div>
-            <h1 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-emerald-400">
-              GEMINI QUANT v1.0
+            <h1 className="text-3xl font-black tracking-tighter text-transparent bg-clip-text bg-gradient-to-r from-emerald-400 to-emerald-400">
+              FishyStock AI
             </h1>
             <p className="text-xs text-slate-500 font-mono mt-1">
               STATUS: <span className="text-emerald-500">AUTONOMOUS_TRADING_ACTIVE</span>
