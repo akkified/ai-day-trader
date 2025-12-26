@@ -1,14 +1,16 @@
+// 1. MUST BE THE VERY FIRST LINE
+require("dotenv").config(); 
+
 const cors = require("cors");
 const express = require("express");
 const Broker = require("./broker");
 const scanMarket = require("./scanner");
-// Destructure trainAI from your ai.js module
 const { decideTrade, trainAI } = require("./ai"); 
 const runTradingCycle = require("./trader");
 const startScheduler = require("./scheduler");
 
 const app = express();
-const PORT = process.env.PORT || 10000; // Standard Render port
+const PORT = process.env.PORT || 10000; 
 
 // Middleware
 app.use(cors());
@@ -29,10 +31,10 @@ app.get("/status", (req, res) => {
 
 /* --- AI & RETRAINING ROUTES --- */
 
-// NEW: This fixes your 404 error
 app.post("/retrain", async (req, res) => {
   try {
     console.log("🚀 Manual Retrain Triggered...");
+    // Pass broker if your training logic needs to check current balance/data
     await trainAI(); 
     res.json({ message: "Neural Network successfully retrained on cloud data." });
   } catch (error) {
@@ -62,7 +64,8 @@ app.get("/scan", async (req, res) => {
     const results = await scanMarket();
     res.json(results);
   } catch (error) {
-    res.status(500).json({ error: "Scan failed" });
+    console.error("Scan Error:", error.message);
+    res.status(500).json({ error: "Scan failed", details: error.message });
   }
 });
 
@@ -107,14 +110,19 @@ app.post("/backtest", async (req, res) => {
 /* --- AUTOMATION CONTROL --- */
 
 app.post("/run", async (req, res) => {
-  await runTradingCycle(broker);
-  res.json(broker.getStatus());
+  try {
+    await runTradingCycle(broker);
+    res.json(broker.getStatus());
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Start the persistent scheduler
 startScheduler(broker);
 
-// REMOVED the first app.listen and kept only this one at the bottom
 app.listen(PORT, () => {
   console.log(`🚀 AI Quant Server running on port ${PORT}`);
+  // Verification log to ensure environment is loaded
+  console.log(`Environment check: ALPHA_VANTAGE_KEY is ${process.env.ALPHA_VANTAGE_KEY ? 'Present' : 'MISSING'}`);
 });
