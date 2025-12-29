@@ -7,7 +7,7 @@ const axios = require("axios");
 async function scanMarket() {
   const symbols = ["SPY", "NVDA", "AAPL", "TSLA", "AMD", "MSFT"];
   const results = [];
-  const API_KEY = process.env.FINNHUB_KEY; // Using Finnhub Token
+  const API_KEY = process.env.FINNHUB_API_KEY; // Corrected Env Var Name
 
   if (!API_KEY) {
     console.error("ERROR: FINNHUB_KEY is missing.");
@@ -24,18 +24,21 @@ async function scanMarket() {
       const quoteRes = await axios.get(quoteUrl);
       const quoteData = quoteRes.data;
 
-      // Get Candles (Historical for RSI)
-      // Resolution 'D' (Daily), last 60 days
-      const to = Math.floor(Date.now() / 1000);
-      const from = to - (60 * 24 * 60 * 60);
-      const candleUrl = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${API_KEY}`;
-      const candleRes = await axios.get(candleUrl);
-      const candleData = candleRes.data;
+      // Get Candles (Historical for RSI) - optional with fallback
+      let rsi = 50;
+      try {
+        const to = Math.floor(Date.now() / 1000);
+        const from = to - (60 * 24 * 60 * 60);
+        const candleUrl = `https://finnhub.io/api/v1/stock/candle?symbol=${symbol}&resolution=D&from=${from}&to=${to}&token=${API_KEY}`;
+        const candleRes = await axios.get(candleUrl);
+        const candleData = candleRes.data;
 
-      // Calculate RSI if we have candle data
-      let rsi = 50; // Default neutral
-      if (candleData.c && candleData.c.length > 14) {
-        rsi = calculateRSI(candleData.c);
+        if (candleData.c && candleData.c.length > 14) {
+          rsi = calculateRSI(candleData.c);
+        }
+      } catch (err) {
+        // Silently ignore candle errors (403/429) to keep the bot running
+        // rsi remains 50
       }
 
       // Finnhub Response Keys:

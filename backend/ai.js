@@ -113,9 +113,12 @@ function decideTrade(stock, marketSentiment = 0, position) {
   const rsi = stock.rsi || 50;
   console.log(`Indicators [${stock.symbol}]: RSI ${rsi.toFixed(1)}`);
 
-  // 1. STRONG BUY: RSI Oversold (< 30)
-  if (rsi < 30 && !position) {
-    return { action: "BUY", confidence, reason: "RSI Oversold (Buy Low)" };
+  // 1. STRONG BUY: RSI Oversold (< 30) OR Panic Drop (< -3%)
+  // If RSI is unavailable/neutral (50), we use price change as a proxy for 'Buy Low'
+  const isOversold = rsi < 30 || (rsi === 50 && stock.changePercent < -3);
+
+  if (isOversold && !position) {
+    return { action: "BUY", confidence, reason: "Oversold / Dip Buy" };
   }
 
   // 2. STRONG SELL: RSI Overbought (> 70)
