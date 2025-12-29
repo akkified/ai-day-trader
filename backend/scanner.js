@@ -7,7 +7,8 @@ const axios = require("axios");
 async function scanMarket() {
   const symbols = ["SPY", "NVDA", "AAPL", "TSLA", "AMD", "MSFT"];
   const results = [];
-  const API_KEY = process.env.FINNHUB_API_KEY; // Corrected Env Var Name
+  // Support both variable names (Prod vs Local)
+  const API_KEY = process.env.FINNHUB_API_KEY || process.env.FINNHUB_KEY;
 
   if (!API_KEY) {
     console.error("ERROR: FINNHUB_KEY is missing.");

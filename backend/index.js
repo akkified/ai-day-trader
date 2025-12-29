@@ -95,11 +95,11 @@ app.listen(PORT, () => {
   console.log(`AI Quant Server running on port ${PORT}`);
 
   // Final diagnostic check
-  const isKeyOk = !!process.env.ALPHA_VANTAGE_KEY;
+  const isKeyOk = !!(process.env.FINNHUB_API_KEY || process.env.FINNHUB_KEY);
   const isAiOk = typeof decideTrade === 'function';
 
   console.log(`--- Startup Health Check ---`);
-  console.log(`1. API Key: ${isKeyOk ? 'Present' : 'MISSING'}`);
+  console.log(`1. Finnhub Key: ${isKeyOk ? 'Present' : 'MISSING'}`);
   console.log(`2. AI Logic: ${isAiOk ? 'Valid' : 'INVALID'}`);
   console.log(`----------------------------`);
 });
