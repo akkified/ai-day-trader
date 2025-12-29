@@ -6,22 +6,22 @@ const scanMarket = require("./scanner");
  */
 async function runTradingCycle(broker, decideTrade) {
   try {
-    console.log("🔄 --- Starting Trading Cycle ---");
-    
-    // 1. Get Market Data (including SPY sentiment)
+    console.log("--- Starting Trading Cycle ---");
+
+    // 1. Get Market Data
     const { stocks, marketSentiment } = await scanMarket();
 
     if (!stocks || stocks.length === 0) {
-      console.log("⚠️ Cycle aborted: No stock data.");
+      console.log("Cycle aborted: No stock data.");
       return;
     }
 
-    console.log(`🌍 Global Market Mood (SPY): ${marketSentiment.toFixed(2)}%`);
+    console.log(`Global Market Mood (SPY): ${marketSentiment.toFixed(2)}%`);
 
     for (const stock of stocks) {
       const currentPosition = broker.positions[stock.symbol];
-      
-      // 2. Safety First: Check Trailing Stop Loss if we already own it
+
+      // 2. Check Trailing Stop Loss
       if (currentPosition) {
         const isStopHit = broker.checkTrailingStop(stock.symbol, stock.price);
         if (isStopHit) {
@@ -38,18 +38,18 @@ async function runTradingCycle(broker, decideTrade) {
       if (decision.action === "BUY" && !currentPosition) {
         // AI sees a breakout opportunity
         broker.buy(stock.symbol, stock.price, marketSentiment, stock.changePercent);
-      } 
+      }
       else if (decision.action === "SELL" && currentPosition) {
         // AI predicts a trend reversal
         await broker.sell(stock.symbol, stock.price, decision.reason || "AI Sell Signal");
       }
     }
-    
-    console.log("✅ --- Cycle Complete ---");
+
+    console.log("--- Cycle Complete ---");
     console.log("Current Portfolio Status:", broker.getStatus());
 
   } catch (error) {
-    console.error("❌ Critical Trader Error:", error.message);
+    console.error("Critical Trader Error:", error.message);
   }
 }
 

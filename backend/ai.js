@@ -24,10 +24,10 @@ const TradeHistory = mongoose.models.TradeHistory || mongoose.model('TradeHistor
 
 // 2. Initialize Network
 let net = new brain.NeuralNetwork({
-  hiddenLayers: [15, 15] 
+  hiddenLayers: [15, 15]
 });
 
-let isTrained = false; // CRITICAL: Safety flag to prevent crashes
+let isTrained = false;
 
 /**
  * Normalization helper: Standardizes values into the 0-1 range.
@@ -38,13 +38,20 @@ const normalize = (val, min, max) => Math.max(0, Math.min(1, (val - min) / (max 
 
 async function trainAI() {
   try {
-    console.log("🧠 AI: Starting Training Cycle...");
+    console.log("AI: Starting Training Cycle...");
 
-    const history = await TradeHistory.find({}).lean();
-    
+    let history = [];
+    try {
+      if (mongoose.connection.readyState === 1) {
+        history = await TradeHistory.find({}).lean();
+      }
+    } catch (e) {
+      console.log("DB not ready, skipping history.");
+    }
+
     // Convert DB records into AI-readable format
     const trainingSet = history.map(item => ({
-      input: { 
+      input: {
         change: normalize(item.input.change || 0, -5, 5),
         market: normalize(item.input.sentiment || 0, -3, 3)
       },
@@ -62,7 +69,7 @@ async function trainAI() {
 
     // Safety: Fallback data to ensure the network can initialize
     if (finalSet.length < 5) {
-      console.log("⚠️ AI: Insufficient data. Adding synthetic anchors.");
+      console.log("AI: Insufficient data. Adding synthetic anchors.");
       finalSet.push({ input: { change: 0.8, market: 0.5 }, output: { buy: 1 } });
       finalSet.push({ input: { change: 0.5, market: 0.2 }, output: { buy: 0 } });
     }
@@ -73,10 +80,10 @@ async function trainAI() {
       log: false
     });
 
-    isTrained = true; // Unlock the decideTrade function
-    console.log(`✅ AI: Training Complete. Lessons Processed: ${finalSet.length}`);
+    isTrained = true;
+    console.log(`AI: Training Complete. Lessons Processed: ${finalSet.length}`);
   } catch (err) {
-    console.error("❌ AI: Training Error:", err.message);
+    console.error("AI: Training Error:", err.message);
   }
 }
 
@@ -93,24 +100,37 @@ function decideTrade(stock, marketSentiment = 0, position) {
     change: normalize(stock.changePercent || 0, -5, 5),
     market: normalize(marketSentiment, -3, 3)
   };
-  
+
   const result = net.run(input);
 
   // CRITICAL FIX: Handle potential null/undefined from net.run
   const confidence = (result && typeof result.buy !== 'undefined') ? result.buy : 0;
 
-  console.log(`🤖 AI [${stock.symbol}]: ${(confidence * 100).toFixed(1)}% Confidence | Market: ${marketSentiment.toFixed(2)}%`);
+  console.log(`AI [${stock.symbol}]: ${(confidence * 100).toFixed(1)}% Confidence | Market: ${marketSentiment.toFixed(2)}%`);
 
   // --- Trading Logic ---
-  
-  // 1. BUY Condition
+
+  const rsi = stock.rsi || 50;
+  console.log(`Indicators [${stock.symbol}]: RSI ${rsi.toFixed(1)}`);
+
+  // 1. STRONG BUY: RSI Oversold (< 30)
+  if (rsi < 30 && !position) {
+    return { action: "BUY", confidence, reason: "RSI Oversold (Buy Low)" };
+  }
+
+  // 2. STRONG SELL: RSI Overbought (> 70)
+  if (position && rsi > 70) {
+    return { action: "SELL", confidence, reason: "RSI Overbought (Sell High)" };
+  }
+
+  // 3. AI Standard BUY Condition
   if (confidence > 0.65 && marketSentiment > -1.5 && !position) {
-    return { action: "BUY", confidence, reason: "Relative Strength" };
-  } 
-  
-  // 2. SELL Condition (AI losing confidence OR macro crash)
+    return { action: "BUY", confidence, reason: "AI Momentum" };
+  }
+
+  // 4. AI Standard SELL Condition (AI losing confidence OR macro crash)
   if (position && (confidence < 0.40 || marketSentiment < -2.5)) {
-    return { action: "SELL", confidence, reason: "Signal Decay" };
+    return { action: "SELL", confidence, reason: "AI Signal Decay" };
   }
 
   return { action: "HOLD", confidence };

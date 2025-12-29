@@ -6,12 +6,12 @@ const express = require("express");
 // Logic Imports
 const Broker = require("./broker");
 const scanMarket = require("./scanner");
-const { decideTrade, trainAI } = require("./ai"); 
+const { decideTrade, trainAI } = require("./ai");
 const runTradingCycle = require("./trader");
 const startScheduler = require("./scheduler");
 
 const app = express();
-const PORT = process.env.PORT || 10000; 
+const PORT = process.env.PORT || 10000;
 
 // Middleware
 app.use(cors());
@@ -29,8 +29,8 @@ app.get("/status", (req, res) => res.json(broker.getStatus()));
 // Manual AI Retrain
 app.post("/retrain", async (req, res) => {
   try {
-    console.log("🚀 Manual Retrain Triggered...");
-    await trainAI(); 
+    console.log("Manual Retrain Triggered...");
+    await trainAI();
     res.json({ message: "Neural Network successfully retrained." });
   } catch (error) {
     res.status(500).json({ error: error.message });
@@ -92,14 +92,14 @@ app.post("/run", async (req, res) => {
 startScheduler(broker, decideTrade);
 
 app.listen(PORT, () => {
-  console.log(`🚀 AI Quant Server running on port ${PORT}`);
-  
+  console.log(`AI Quant Server running on port ${PORT}`);
+
   // Final diagnostic check
   const isKeyOk = !!process.env.ALPHA_VANTAGE_KEY;
   const isAiOk = typeof decideTrade === 'function';
-  
+
   console.log(`--- Startup Health Check ---`);
-  console.log(`1. API Key: ${isKeyOk ? '✅ Present' : '❌ MISSING'}`);
-  console.log(`2. AI Logic: ${isAiOk ? '✅ Valid' : '❌ INVALID'}`);
+  console.log(`1. API Key: ${isKeyOk ? 'Present' : 'MISSING'}`);
+  console.log(`2. AI Logic: ${isAiOk ? 'Valid' : 'INVALID'}`);
   console.log(`----------------------------`);
 });
