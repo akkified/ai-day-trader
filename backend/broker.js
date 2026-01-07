@@ -131,6 +131,7 @@ class Broker {
       amount: pos.amount,
       profit, 
       reason, 
+      confidence: pos.confidence, // <--- added confidence here
       time: new Date() 
     };
     
