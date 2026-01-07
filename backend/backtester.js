@@ -16,7 +16,8 @@ async function runBacktest(historyFile) {
 
     // 2. Ask the AI for a decision based on THIS historical moment
     const position = broker.positions[bar.symbol];
-    const decision = decideTrade(bar, position);
+    // pass marketSentiment = 0 for backtests (no SPY context), position as 3rd arg
+    const decision = decideTrade(bar, 0, position);
 
     // 3. Execute trades immediately
     if (decision.action === "BUY" && !position) {

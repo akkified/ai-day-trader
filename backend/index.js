@@ -64,10 +64,11 @@ app.get("/scan", async (req, res) => {
 // Helper route to see what the AI thinks right now
 app.get("/decide", async (req, res) => {
   try {
-    const scanResults = await scanMarket();
-    const decisions = scanResults.map(stock => ({
+    // scanMarket returns { stocks, marketSentiment }
+    const { stocks, marketSentiment } = await scanMarket();
+    const decisions = stocks.map(stock => ({
       symbol: stock.symbol,
-      decision: decideTrade(stock, broker.positions[stock.symbol])
+      decision: decideTrade(stock, marketSentiment, broker.positions[stock.symbol])
     }));
     res.json(decisions);
   } catch (error) {

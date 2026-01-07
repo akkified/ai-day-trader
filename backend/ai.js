@@ -113,8 +113,17 @@ function decideTrade(stock, marketSentiment = 0, position) {
   const rsi = stock.rsi || 50;
   console.log(`Indicators [${stock.symbol}]: RSI ${rsi.toFixed(1)}`);
 
+  // --- NEW: Extract original entry price and current price for position-based sell decisions
+  const originalPrice = position && typeof position.entryPrice === 'number' ? position.entryPrice : null;
+  const currentPrice = typeof stock.price === 'number' ? stock.price : (stock.c || null);
+
+  let unrealizedPct = null;
+  if (originalPrice !== null && currentPrice !== null) {
+    unrealizedPct = ((currentPrice - originalPrice) / originalPrice) * 100;
+    console.log(`Position [${stock.symbol}]: entry=$${originalPrice.toFixed(2)} current=$${currentPrice.toFixed(2)} (${unrealizedPct.toFixed(2)}%)`);
+  }
+
   // 1. STRONG BUY: RSI Oversold (< 30) OR Panic Drop (< -3%)
-  // If RSI is unavailable/neutral (50), we use price change as a proxy for 'Buy Low'
   const isOversold = rsi < 30 || (rsi === 50 && stock.changePercent < -3);
 
   if (isOversold && !position) {
@@ -124,6 +133,17 @@ function decideTrade(stock, marketSentiment = 0, position) {
   // 2. STRONG SELL: RSI Overbought (> 70)
   if (position && rsi > 70) {
     return { action: "SELL", confidence, reason: "RSI Overbought (Sell High)" };
+  }
+
+  // 2b. NEW: Profit target / stop-loss based on original vs current price
+  if (position && unrealizedPct !== null) {
+    // example thresholds: take profit at +3%, stop loss at -2%
+    if (unrealizedPct >= 3) {
+      return { action: "SELL", confidence, reason: "Profit Target Reached" };
+    }
+    if (unrealizedPct <= -2) {
+      return { action: "SELL", confidence, reason: "Stop Loss Hit" };
+    }
   }
 
   // 3. AI Standard BUY Condition
