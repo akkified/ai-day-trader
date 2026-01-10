@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "quAInt",
+  title: "AlpacaAI",
   description: "Advanced Automated Trading Dashboard",
 };
 
