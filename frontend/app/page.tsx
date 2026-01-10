@@ -85,7 +85,7 @@ export default function TradingDashboard() {
         {/* --- HEADER --- */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-900/50">
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tighter">Alpaca</h1>
+            <h1 className="text-3xl font-black text-white tracking-tighter">AlpacaAI</h1>
           </div>
         </header>
 
