@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Quant-Trader Joe's",
+  title: "quAInt",
   description: "Advanced Automated Trading Dashboard",
 };
 

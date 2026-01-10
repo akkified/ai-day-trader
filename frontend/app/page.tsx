@@ -85,7 +85,7 @@ export default function TradingDashboard() {
         {/* --- HEADER --- */}
         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6 border-b border-zinc-900/50">
           <div>
-            <h1 className="text-3xl font-black text-white tracking-tighter">QUANT-TRADER <span className="text-blue-500">JOE'S</span></h1>
+            <h1 className="text-3xl font-black text-white tracking-tighter">qu<span className="text-blue-500">AI</span><span className="text-3xl font-black text-white tracking-tighter">nt</span></h1>
           </div>
         </header>
 
